@@ -632,14 +632,16 @@ impl<'index> Updater<'_> {
       ORD_TX_TO_OPERATIONS: &mut wtx.open_table(ORD_TX_TO_OPERATIONS)?,
       COLLECTIONS_KEY_TO_INSCRIPTION_ID: &mut wtx.open_table(COLLECTIONS_KEY_TO_INSCRIPTION_ID)?,
       COLLECTIONS_INSCRIPTION_ID_TO_KINDS: &mut wtx
-        .open_table(COLLECTIONS_INSCRIPTION_ID_TO_KINDS)?,
+        .open_multimap_table(COLLECTIONS_INSCRIPTION_ID_TO_KINDS)?,
       SEQUENCE_NUMBER_TO_INSCRIPTION_ENTRY: &mut sequence_number_to_inscription_entry,
       OUTPOINT_TO_ENTRY: &mut outpoint_to_entry,
       BRC20_BALANCES: &mut wtx.open_table(BRC20_BALANCES)?,
       BRC20_TOKEN: &mut wtx.open_table(BRC20_TOKEN)?,
       BRC20_EVENTS: &mut wtx.open_table(BRC20_EVENTS)?,
-      BRC20_TRANSFERABLELOG: &mut wtx.open_table(BRC20_TRANSFERABLELOG)?,
-      BRC20_INSCRIBE_TRANSFER: &mut wtx.open_table(BRC20_INSCRIBE_TRANSFER)?,
+      BRC20_SATPOINT_TO_TRANSFERABLE_ASSETS: &mut wtx
+        .open_table(BRC20_SATPOINT_TO_TRANSFERABLE_ASSETS)?,
+      BRC20_ADDRESS_TICKER_TO_TRANSFERABLE_ASSETS: &mut wtx
+        .open_multimap_table(BRC20_ADDRESS_TICKER_TO_TRANSFERABLE_ASSETS)?,
     };
 
     // Create a protocol manager to index the block of bitmap data.

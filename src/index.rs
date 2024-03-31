@@ -1,6 +1,7 @@
 use crate::okx::datastore::brc20::redb::table::{
   get_balance, get_balances, get_token_info, get_tokens_info, get_transaction_receipts,
-  get_transferable, get_transferable_by_tick,
+  get_transferable_assets_by_account, get_transferable_assets_by_account_ticker,
+  get_transferable_assets_by_outpoint,
 };
 use crate::okx::datastore::ord::redb::table::{
   get_collection_inscription_id, get_collections_of_inscription, get_transaction_operations,
@@ -95,13 +96,13 @@ define_table! { WRITE_TRANSACTION_STARTING_BLOCK_COUNT_TO_TIMESTAMP, u32, u128 }
 // new
 define_table! { ORD_TX_TO_OPERATIONS, &TxidValue, &[u8] }
 define_table! { COLLECTIONS_KEY_TO_INSCRIPTION_ID, &str, InscriptionIdValue }
-define_table! { COLLECTIONS_INSCRIPTION_ID_TO_KINDS, InscriptionIdValue, &[u8] }
+define_multimap_table! { COLLECTIONS_INSCRIPTION_ID_TO_KINDS, InscriptionIdValue, &[u8] }
 
 define_table! { BRC20_BALANCES, &str, &[u8] }
 define_table! { BRC20_TOKEN, &str, &[u8] }
 define_table! { BRC20_EVENTS, &TxidValue, &[u8] }
-define_table! { BRC20_TRANSFERABLELOG, &str, &[u8] }
-define_table! { BRC20_INSCRIBE_TRANSFER, InscriptionIdValue, &[u8] }
+define_table! { BRC20_SATPOINT_TO_TRANSFERABLE_ASSETS, &SatPointValue, &[u8] }
+define_multimap_table! { BRC20_ADDRESS_TICKER_TO_TRANSFERABLE_ASSETS, &str, &SatPointValue }
 
 #[derive(Debug, PartialEq)]
 pub enum List {
@@ -359,14 +360,14 @@ impl Index {
         // new ord tables
         tx.open_table(ORD_TX_TO_OPERATIONS)?;
         tx.open_table(COLLECTIONS_KEY_TO_INSCRIPTION_ID)?;
-        tx.open_table(COLLECTIONS_INSCRIPTION_ID_TO_KINDS)?;
+        tx.open_multimap_table(COLLECTIONS_INSCRIPTION_ID_TO_KINDS)?;
 
         // brc20 tables
+        tx.open_multimap_table(BRC20_ADDRESS_TICKER_TO_TRANSFERABLE_ASSETS)?;
         tx.open_table(BRC20_BALANCES)?;
         tx.open_table(BRC20_TOKEN)?;
         tx.open_table(BRC20_EVENTS)?;
-        tx.open_table(BRC20_TRANSFERABLELOG)?;
-        tx.open_table(BRC20_INSCRIBE_TRANSFER)?;
+        tx.open_table(BRC20_SATPOINT_TO_TRANSFERABLE_ASSETS)?;
 
         {
           let mut outpoint_to_sat_ranges = tx.open_table(OUTPOINT_TO_SAT_RANGES)?;
@@ -637,7 +638,7 @@ impl Index {
       total_bytes,
       COLLECTIONS_KEY_TO_INSCRIPTION_ID,
     );
-    insert_table_info(
+    insert_multimap_table_info(
       &mut tables,
       &wtx,
       total_bytes,
@@ -646,8 +647,18 @@ impl Index {
     insert_table_info(&mut tables, &wtx, total_bytes, BRC20_BALANCES);
     insert_table_info(&mut tables, &wtx, total_bytes, BRC20_TOKEN);
     insert_table_info(&mut tables, &wtx, total_bytes, BRC20_EVENTS);
-    insert_table_info(&mut tables, &wtx, total_bytes, BRC20_TRANSFERABLELOG);
-    insert_table_info(&mut tables, &wtx, total_bytes, BRC20_INSCRIBE_TRANSFER);
+    insert_table_info(
+      &mut tables,
+      &wtx,
+      total_bytes,
+      BRC20_SATPOINT_TO_TRANSFERABLE_ASSETS,
+    );
+    insert_multimap_table_info(
+      &mut tables,
+      &wtx,
+      total_bytes,
+      BRC20_ADDRESS_TICKER_TO_TRANSFERABLE_ASSETS,
+    );
 
     for table in wtx.list_tables()? {
       assert!(tables.contains_key(table.name()));
