@@ -11,7 +11,8 @@ use crate::{
           get_transferable_assets_by_account, get_transferable_assets_by_account_ticker,
           get_transferable_assets_by_outpoint, get_transferable_assets_by_satpoint,
           insert_token_info, insert_transferable_asset, remove_transferable_asset,
-          save_transaction_receipts, update_mint_token_info, update_token_balance,
+          save_transaction_receipts, update_burned_token_info, update_mint_token_info,
+          update_token_balance,
         },
         Balance, Brc20Reader, Brc20ReaderWriter, Receipt, Tick, TokenInfo, TransferableLog,
       },
@@ -28,17 +29,17 @@ use crate::{
       ScriptKey,
     },
     lru::SimpleLru,
-    protocol::BlockContext,
+    protocol::ChainContext,
   },
-  SatPoint,
+  Chain, SatPoint,
 };
 use anyhow::anyhow;
-use bitcoin::{Network, OutPoint, TxOut, Txid};
+use bitcoin::{OutPoint, TxOut, Txid};
 use redb::{MultimapTable, Table};
 
 #[allow(non_snake_case)]
 pub struct Context<'a, 'db, 'txn> {
-  pub(crate) chain: BlockContext,
+  pub(crate) chain_conf: ChainContext,
   pub(crate) tx_out_cache: &'a mut SimpleLru<OutPoint, TxOut>,
   pub(crate) hit: u64,
   pub(crate) miss: u64,
@@ -84,15 +85,15 @@ impl<'a, 'db, 'txn> OrdReader for Context<'a, 'db, 'txn> {
   fn get_script_key_on_satpoint(
     &mut self,
     satpoint: &SatPoint,
-    network: Network,
+    chain: Chain,
   ) -> crate::Result<ScriptKey, Self::Error> {
     if let Some(tx_out) = self.tx_out_cache.get(&satpoint.outpoint) {
       self.hit += 1;
-      Ok(ScriptKey::from_script(&tx_out.script_pubkey, network))
+      Ok(ScriptKey::from_script(&tx_out.script_pubkey, chain))
     } else if let Some(tx_out) = get_txout_by_outpoint(self.OUTPOINT_TO_ENTRY, &satpoint.outpoint)?
     {
       self.miss += 1;
-      Ok(ScriptKey::from_script(&tx_out.script_pubkey, network))
+      Ok(ScriptKey::from_script(&tx_out.script_pubkey, chain))
     } else {
       Err(anyhow!(
         "failed to get tx out! error: outpoint {} not found",
@@ -246,6 +247,14 @@ impl<'a, 'db, 'txn> Brc20ReaderWriter for Context<'a, 'db, 'txn> {
     minted_block_number: u32,
   ) -> crate::Result<(), Self::Error> {
     update_mint_token_info(self.BRC20_TOKEN, tick, minted_amt, minted_block_number)
+  }
+
+  fn update_burned_token_info(
+    &mut self,
+    tick: &Tick,
+    burned_amt: u128,
+  ) -> crate::Result<(), Self::Error> {
+    update_burned_token_info(self.BRC20_TOKEN, tick, burned_amt)
   }
 
   fn save_transaction_receipts(
