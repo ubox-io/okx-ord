@@ -353,7 +353,8 @@ fn process_transfer(context: &mut Context, msg: &ExecutionMessage) -> Result<Eve
 
   let amt = Into::<Num>::into(transferable.amount);
 
-  if transferable.owner != msg.from {
+  // resolve: regtest p2sh-p2wpkh address
+  if transferable.owner.to_string() != msg.from.to_string() {
     return Err(Error::BRC20Error(BRC20Error::TransferableOwnerNotMatch(
       msg.inscription_id,
     )));
